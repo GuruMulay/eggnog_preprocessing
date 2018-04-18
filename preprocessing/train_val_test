@@ -1,0 +1,123 @@
+        sound
+s04  without
+s05  without  
+s06  without
+s07  without
+
+s08  with
+s09  with
+s10  with
+s11  with
+s12  with
+s14  with
+s15  with
+
+s16  without
+
+s17  with  
+
+s18  without
+
+s19  with
+
+s20  without
+
+s21  with
+
+
+
+
+=======
+17 sessions
+percent = 70:20:10
+percent = ?
+sessions = 12:3:2
+=======
+
+    s04  without
+    s05  without  
+    s06  without
+s07  without
+
+    s08  with
+    s09  with
+    s10  with
+    s11  with
+    s12  with
+s14  with
+s15  with
+
+    s16  without
+    s17  with  
+
+s18  without
+s19  with
+
+    s20  without
+    s21  with
+
+==============================================
+Training sessions  12
+s04  without
+s05  without  
+s06  without
+s16  without
+s20  without
+s08  with
+s09  with
+s10  with
+s11  with
+s12  with
+s17  with  
+s21  with
+
+
+Validation sessions  3
+s07  without
+s14  with
+s15  with
+
+
+Test sessions  2
+s18  without
+s19  with
+
+
+==============================================
+after adding s01, s02, and s03
+==============================================
+=======
+20 sessions
+percent = 70:20:10
+percent = ?
+sessions = 14:4:2
+=======
+
+==============================================
+Training sessions  12
+s01  without
+s02  without
+s03  without
+s04  without
+s05  without  
+s16  without
+s20  without
+s08  with
+s09  with
+s10  with
+s11  with
+s12  with
+s17  with  
+s21  with
+
+
+Validation sessions  3
+s06  without
+s07  without
+s14  with
+s15  with
+
+
+Test sessions  2
+s18  without
+s19  with
