@@ -164,6 +164,7 @@ def load_skeleton_data_for_video(video_file_path):
     rgb_skeleton_data = np.array(rgb_skeleton_data)
     print("rgb_skeleton_data.shape", rgb_skeleton_data.shape)
     
+    # assert that there are same number of lines on both skeleton files
     assert(xyz_skeleton_data.shape[0] == rgb_skeleton_data.shape[0])
     assert((xyz_skeleton_data[...,0] == rgb_skeleton_data[...,0]).all())
     
@@ -182,7 +183,7 @@ def load_frames_file(video_file_path):
             cols = line.split(',')
             frame_time_dict[np.int64(cols[0])] = np.float64(cols[1])
             
-    print("total frames in the video = ", len(frame_time_dict))
+    print("total frames in the video =", len(frame_time_dict))
     return frame_time_dict
 
 
@@ -276,7 +277,7 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
     cap = cv2.VideoCapture(video_path)
     assert(cap.isOpened() == True)
     for k in frame_time_dict.keys():
-        nearest_idx, nearest_time = find_nearest_frameindex_from_skeleton_file(rgb_skeleton_data[...,0], frame_time_dict[k]) 
+        nearest_idx, nearest_time = find_nearest_frameindex_from_skeleton_file(rgb_skeleton_data[...,0], frame_time_dict[k]) # take column 0 (time) from rgb data
         # print("k (video frame) ", k, "\t time", frame_time_dict[k], "\t nearest_idx from skeleton file", nearest_idx, "\t nearest_time", nearest_time)  # print("k=>", k, nearest_idx, "<= nearest_idx")
        
         if (abs(frame_time_dict[k] - nearest_time) > 1000000):  # 100 ns ticks, so 1000000 = 0.1sec
@@ -307,12 +308,12 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
                     skimage.io.imsave(os.path.join(save_dir, video_name + "_vfr_" + str(k) + "_skfr_" + str(nearest_idx) + "_240x320.jpg"), img_down)
                     
                     
-                    # 3 
+                    # 3
                     # save heatmaps and pafs
                     sk_keypoints = rgb_skeleton_data[nearest_idx][1:]  # ignore index 0 (time)
                     # print("sk_kp shape =", sk_keypoints.shape)  # (38, )
                     
-                    # for 20 heatmaps =====================================
+                    # for 20 (actually 19 + background) heatmaps =====================================
                     for kpn in range(sk_keypoints.shape[0]//2):
                         kpx = sk_keypoints[2*kpn]
                         kpy = sk_keypoints[2*kpn+1]  # print(kpx, kpy)
@@ -405,4 +406,8 @@ def process_session(session_name):
             
 if __name__ == "__main__":
     print("reading videos and writing img240x320, paf30x40, and hm30x40...")
+    
+    """
+    Usage: provide the session name as argument; the path of eggnog_dataset is needed to be set at the top as a global variable.
+    """
     process_session(sys.argv[1])
