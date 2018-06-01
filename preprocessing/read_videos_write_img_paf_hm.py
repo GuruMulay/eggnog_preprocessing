@@ -2,6 +2,8 @@ import sys
 import os
 import numpy as np
 import cv2
+import av
+import PIL
 
 import matplotlib.pyplot as plt
 from sklearn.preprocessing import normalize
@@ -11,8 +13,8 @@ from skimage.transform import resize, pyramid_reduce
 
 # global variables
 # eggnog_dataset_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_cpm_test/"  # for testing this python file
-# eggnog_dataset_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_cpm/"
-eggnog_dataset_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_s123/"  # for s01, s02, s03
+eggnog_dataset_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_cpm/"
+# eggnog_dataset_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_s123/"  # for s01, s02, s03
 ground_truth_factor = 8
 
 paf_pairs_indices = [[1, 14], [0, 1], [12, 0], [13, 0], 
@@ -22,7 +24,7 @@ paf_pairs_indices = [[1, 14], [0, 1], [12, 0], [13, 0],
                     ]
 
 ### ********** ###
-process_s010203 = True
+process_s010203 = False
 
 """
 # note 1:
@@ -109,6 +111,168 @@ def load_skeleton_data_for_video(video_file_path):
 #                                              200,201  # ThumbRight
 #                                             ))
 
+
+    visible_skeleton_kp = [7,8,9,  # SpineBase 0
+                           15,16,17,  # SpineMid
+                           23,24,25,  # Neck
+                           31,32,33,  # Head
+                           39,40,41,  # ShoulderLeft
+                           47,48,49,  # ElbowLeft
+                           55,56,57,  # WristLeft
+                           63,64,65,  # HandLeft
+                           71,72,73,  # ShoulderRight
+                           79,80,81,  # ElbowRight
+                           87,88,89,  # WristRight
+                           95,96,97,  # HandRight
+                           103,104,105,  # HipLeft
+                           # 111,112,113,  # KneeLeft
+                           # 119,120,121,  # AnkleLeft
+                           # 127,128,129,  # FootLeft
+                           135,136,137,  # HipRight
+                           # 143,144,145,  # KneeRight
+                           # 151,152,153,  # AnkleRight
+                           # 159,160,161,  # FootRight
+                           167,168,169,  # SpineShoulder
+                           175,176,177,  # HandTipLeft
+                           183,184,185,  # ThumbLeft
+                           191,192,193,  # HandTipRight
+                           199,200,201  # ThumbRight
+                          ]
+        
+        
+    symbol_inf_neg = "-∞"
+    symbol_inf_pos = "∞"
+    rgb_skeleton_data = []
+    
+    with open(video_file_path[:-9] + 'RGBSkeleton.txt') as rgb_sk:
+        next(rgb_sk)
+        line_index = 0
+        for line in rgb_sk:
+            cols = line.split(',')
+            cols_actual_data = [cols[i] for i in visible_skeleton_kp]
+            # print(len(cols), len(cols_actual_data), cols_actual_data)
+            
+            for j, field in enumerate(cols_actual_data):
+                if symbol_inf_neg in field or symbol_inf_pos in field:
+                    cols_actual_data[j] = np.inf  # to replace "∞" symbols with np.inf
+                elif "TRACKED" in field:
+                    cols_actual_data[j] = 2
+                elif "INFERRED" in field:
+                    cols_actual_data[j] = 1
+                elif "UNTRACKED" in field:
+                    cols_actual_data[j] = 0
+                else:
+                    cols_actual_data[j] = np.float64(field)
+            # append 'time' from column 0 of the xyz_skeleton_data to the column 0 of cols_actual_data
+            cols_actual_data.insert(0, xyz_skeleton_data[line_index][0])
+            # print(len(cols), len(cols_actual_data), cols_actual_data)
+            line_index += 1
+            assert(len(cols_actual_data) == 58)  # 19 joints * 3 (tracking_info,x,y) + 1 (Time)
+            rgb_skeleton_data.append(cols_actual_data)
+            
+            
+    rgb_skeleton_data = np.array(rgb_skeleton_data)
+    print("rgb_skeleton_data.shape", rgb_skeleton_data.shape)
+    
+    # assert that there are same number of lines on both skeleton files
+    assert(xyz_skeleton_data.shape[0] == rgb_skeleton_data.shape[0])
+    assert((xyz_skeleton_data[...,0] == rgb_skeleton_data[...,0]).all())
+    
+    return xyz_skeleton_data, rgb_skeleton_data
+
+
+def load_skeleton_data_for_video_v1(video_file_path):
+    """
+    load the xyz and rgb skeleton files for given video 
+    """
+    xyz_skeleton_data = np.loadtxt(video_file_path[:-9] + 'Skeleton.txt', dtype='float', delimiter=',', skiprows=1, 
+                                   usecols=(1,  # Time
+                                            9,10,11,  # SpineBase 0
+                                            18,19,20,  # SpineMid 
+                                            27,28,29,  # Neck
+                                            36,37,38,  # Head
+                                            45,46,47,  # ShoulderLeft
+                                            54,55,56,  # ElbowLeft
+                                            63,64,65,  # WristLeft
+                                            72,73,74,  # HandLeft
+                                            81,82,83,  # ShoulderRight
+                                            90,91,92,  # ElbowRight
+                                            99,100,101,  # WristRight
+                                            108,109,110,  # HandRight
+                                            117,118,119,  # HipLeft (added)
+                                            # 126,127,128,  # KneeLeft
+                                            # 135,136,137,  # AnkleLeft
+                                            # 144,145,146,  # FootLeft
+                                            153,154,155,  # HipRight (added)
+                                            # 162,163,164,  # KneeRight
+                                            # 171,172,173,  # AnkleRight
+                                            # 180,181,182,  # FootRight
+                                            189,190,191,  # SpineShoulder
+                                            198,199,200,  # HandTipLeft
+                                            207,208,209,  # ThumbLeft
+                                            216,217,218,  # HandTipRight
+                                            225,226,227  # ThumbRight 
+                                           ))
+    
+    assert(xyz_skeleton_data.shape[1] == 58) # 19 joints * 3 (x,y,z) + 1 (time)
+    print("xyz_skeleton_data.shape", xyz_skeleton_data.shape)
+    
+#     rgb_skeleton_data = np.loadtxt(video_file_path[:-9] + 'RGBSkeleton.txt', dtype='float', delimiter=',', skiprows=1, 
+#                                    converters=cnv, 
+#                                    usecols=(8,9,  
+#                                              16,17,
+#                                              24,25,
+#                                              32,33,
+#                                              40,41,
+#                                              48,49,
+#                                              56,57,
+#                                              64,65,
+#                                              72,73,
+#                                              80,81,
+#                                              88,89,
+#                                              96,97,
+#                                              104,105,  # HipLeft
+#                                              # 112,113,  # KneeLeft
+#                                              # 120,121,  # AnkleLeft
+#                                              # 128,129,  # FootLeft
+#                                              136,137,
+#                                              # 144,145,  # KneeRight
+#                                              # 152,153,  # AnkleRight
+#                                              # 160,161,  # FootRight
+#                                              168,169,  # SpineShoulder
+#                                              176,177,  # HandTipLeft
+#                                              184,185,  # ThumbLeft
+#                                              192,193,  # HandTipRight
+#                                              200,201  # ThumbRight
+#                                             ))
+
+#     visible_skeleton_kp = [7,8,9,  # SpineBase 0
+#                            15,16,17,  # SpineMid
+#                            23,24,25,  # Neck
+#                            31,32,33,  # Head
+#                            39,40,41,  # ShoulderLeft
+#                            47,48,49,  # ElbowLeft
+#                            55,56,57,  # WristLeft
+#                            63,64,65,  # HandLeft
+#                            71,72,73,  # ShoulderRight
+#                            79,80,81,  # ElbowRight
+#                            87,88,89,  # WristRight
+#                            95,96,97,  # HandRight
+#                            103,104,105,  # HipLeft
+#                            # 111,112,113,  # KneeLeft
+#                            # 119,120,121,  # AnkleLeft
+#                            # 127,128,129,  # FootLeft
+#                            135,136,137,  # HipRight
+#                            # 143,144,145,  # KneeRight
+#                            # 151,152,153,  # AnkleRight
+#                            # 159,160,161,  # FootRight
+#                            167,168,169,  # SpineShoulder
+#                            175,176,177,  # HandTipLeft
+#                            183,184,185,  # ThumbLeft
+#                            191,192,193,  # HandTipRight
+#                            199,200,201  # ThumbRight
+#                           ]
+    
     visible_skeleton_kp = [8,9,  # SpineBase 0
                            16,17,  # SpineMid
                            24,25,  # Neck
@@ -135,7 +299,8 @@ def load_skeleton_data_for_video(video_file_path):
                            192,193,  # HandTipRight
                            200,201  # ThumbRight
                           ]
-    
+        
+        
     symbol_inf_neg = "-∞"
     symbol_inf_pos = "∞"
     rgb_skeleton_data = []
@@ -191,8 +356,7 @@ def find_nearest_frameindex_from_skeleton_file(sk_time_array, time):
     idx = (np.abs(sk_time_array - time)).argmin()
     return idx, sk_time_array[idx]
 
-
-# 
+#
 
 
 def get_heatmap(index_array, pxpy_list):
@@ -274,9 +438,14 @@ def kpx_kpy_transformer(kp_list):
     
 def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_data, frame_time_dict):
     mismatch_count = 0
-    cap = cv2.VideoCapture(video_path)
-    assert(cap.isOpened() == True)
-    for k in frame_time_dict.keys():
+    ## cap = cv2.VideoCapture(video_path)
+    ## assert(cap.isOpened() == True)
+    
+    container = av.open(video_path)
+    
+    for k, fr in enumerate(container.decode(video=0)):
+        assert(k == fr.index)
+    ## for k in frame_time_dict.keys():
         nearest_idx, nearest_time = find_nearest_frameindex_from_skeleton_file(rgb_skeleton_data[...,0], frame_time_dict[k]) # take column 0 (time) from rgb data
         # print("k (video frame) ", k, "\t time", frame_time_dict[k], "\t nearest_idx from skeleton file", nearest_idx, "\t nearest_time", nearest_time)  # print("k=>", k, nearest_idx, "<= nearest_idx")
        
@@ -286,8 +455,15 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
         else:         
             # print(rgb_skeleton_data[nearest_idx])
             if(np.inf not in rgb_skeleton_data[nearest_idx]):  # do not add if there is np.inf in the line
-                cap.set(cv2.CAP_PROP_POS_FRAMES, k)
-                success, frame = cap.read()  # frame is read as (h, w, c)
+                
+                ## cap.set(cv2.CAP_PROP_POS_FRAMES, k)
+                ## success, frame = cap.read()  # frame is read as (h, w, c)
+                
+                success = True  # hard-coded for PyAV
+                frame = fr.to_image()
+                # converting PIL (<class 'PIL.Image.Image'>) to <class 'numpy.ndarray'>
+                img = np.asarray(frame)  # h, w, c
+                
                 if success:
                     os.makedirs(os.path.join(npy_path, video_name), exist_ok=True)
                     save_dir = os.path.join(npy_path, video_name)
@@ -299,8 +475,9 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
 
                     # 2
                     # save downsampled image
-                    # bgr to rgb
-                    img = frame[...,::-1]
+                    
+                    ## bgr to rgb
+                    ## img = frame[...,::-1]
                     img_central = img[:, 240:(1920-240), :]
                     # downsample by 4.5
                     img_down = pyramid_reduce(img_central, downscale=4.5)  # better than resize
@@ -310,7 +487,8 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
                     
                     # 3
                     # save heatmaps and pafs
-                    sk_keypoints = rgb_skeleton_data[nearest_idx][1:]  # ignore index 0 (time)
+                    sk_keypoints_with_tracking_info = rgb_skeleton_data[nearest_idx][1:]  # ignore index 0 (time)
+                    sk_keypoints = np.delete(sk_keypoints_with_tracking_info, np.arange(0, sk_keypoints_with_tracking_info.size, 3))  # this is without tracking info, by removing the tracking info
                     # print("sk_kp shape =", sk_keypoints.shape)  # (38, )
                     
                     # for 20 (actually 19 + background) heatmaps =====================================
@@ -365,10 +543,10 @@ def save_2d_keypoints_and_images(video_name, video_path, npy_path, rgb_skeleton_
                     # save the 2d keypoints of shape (38,)
                     # print(rgb_skeleton_data[nearest_idx])
                     # print(save_dir, os.path.join("", video_name + "_vfr_" + str(k) + "_skfr_" + str(nearest_idx) + '.npy'))
-                    np.save(os.path.join(save_dir, video_name + "_vfr_" + str(k) + "_skfr_" + str(nearest_idx) + '.npy'), rgb_skeleton_data[nearest_idx][1:])  # index 0 is time
+                    np.save(os.path.join(save_dir, video_name + "_vfr_" + str(k) + "_skfr_" + str(nearest_idx) + '.npy'), rgb_skeleton_data[nearest_idx][1:])  # index 0 is time # saving all 57 values 19 * 3 (tracking, x, y)
     
     
-    cap.release()
+    ## cap.release()
     print("mismatch_count =",  mismatch_count)
     
     
@@ -389,7 +567,7 @@ def process_session(session_name):
             if process_s010203:
                 video = video.replace('RGB', 'Video')
                 os.rename(video_file_path, os.path.join(eggnog_dataset_path, session_name, layout, video))  # video is renamed
-                os.rename(video_file_path[:-4] + ".frames", os.path.join(eggnog_dataset_path, session_name, layout, video[:-4] + ".frames"))  # video is renamed
+                os.rename(video_file_path[:-4] + ".frames", os.path.join(eggnog_dataset_path, session_name, layout, video[:-4] + ".frames"))  # .frames is renamed
                 video_file_path = os.path.join(eggnog_dataset_path, session_name, layout, video)
             
             #1
@@ -403,6 +581,17 @@ def process_session(session_name):
             save_2d_keypoints_and_images(video[:-4], video_file_path, npy_path, rgb_skeleton_data, frame_time_dict)
             
             
+
+def test_skeleton_reader():
+    video_file_path = "/s/red/b/nobackup/data/eggnog_cpm/eggnog_cpm/s04/part2_layout_p07/20151113_230303_00_Video.avi"
+    xyz_skeleton_data, rgb_skeleton_data = load_skeleton_data_for_video(video_file_path)
+    xyz_skeleton_data_v1, rgb_skeleton_data_v1 = load_skeleton_data_for_video_v1(video_file_path)
+    
+    index = -1
+    print("xyz_skeleton_data, rgb_skeleton_data", xyz_skeleton_data.shape, rgb_skeleton_data.shape)
+    print("rgb skeleton v2", rgb_skeleton_data[index])
+    print("rgb skeleton v1", rgb_skeleton_data_v1[index])
+    
             
 if __name__ == "__main__":
     print("reading videos and writing img240x320, paf30x40, and hm30x40...")
@@ -410,4 +599,8 @@ if __name__ == "__main__":
     """
     Usage: provide the session name as argument; the path of eggnog_dataset is needed to be set at the top as a global variable.
     """
+    
     process_session(sys.argv[1])
+
+#     test_skeleton_reader()
+    
